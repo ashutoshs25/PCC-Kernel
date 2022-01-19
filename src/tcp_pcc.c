@@ -48,12 +48,12 @@
 #define PCC_GRAD_STEP_SIZE 25 /* defaults step size for gradient ascent */
 #define PCC_MAX_SWING_BUFFER 2 /* number of RTTs to dampen gradient ascent */
 
-#define PCC_LAT_INFL_FILTER 30 /* latency inflation below 3% is ignored */
+#define PCC_LAT_INFL_FILTER 5 /* latency inflation below 3% is ignored */
 
 /* Rates must differ by at least 2% or gradients are very noisy. */
 #define PCC_MIN_RATE_DIFF_RATIO_FOR_GRAD 20
 
-#define PCC_MIN_CHANGE_BOUND 100 /* first rate change is at most 10% of rate */
+#define PCC_MIN_CHANGE_BOUND 200 /* first rate change is at most 10% of rate */
 #define PCC_CHANGE_BOUND_STEP 70 /* consecutive rate changes can go up by 7% */
 #define PCC_AMP_MIN 2 /* starting amplifier for gradient ascent step size */
 
@@ -311,7 +311,7 @@ static void pcc_calc_utility_vivace(struct pcc_data *pcc, struct pcc_interval *i
     if (pcc->start_mode && loss_ratio < 100)
         loss_ratio = 0;
 
-	util = /* int_sqrt((u64)rate)*/ rate - (rate * (900 * lat_infl + 11 * loss_ratio)) / PCC_SCALE;
+	util = int_sqrt((u64)rate) - (rate * (900 * lat_infl + 11 * loss_ratio)) / PCC_SCALE;
 
 	printk(KERN_INFO
 		"%d ucalc: rate %lld sent %u delv %lld lost %lld lat (%lld->%lld) util %lld rate %lld thpt %lld\n",
@@ -410,13 +410,13 @@ static void pcc_decide(struct pcc_data *pcc, struct sock *sk)
 	new_rate = pcc_decide_rate(pcc);
 
 	if (new_rate != pcc->rate) {
-		printk(KERN_INFO "%d decide: on new rate %d %d (%d)\n",
+		printk(KERN_INFO "%d decide: on new rate %d %lld (%d)\n",
 			   pcc->id, pcc->rate < new_rate, new_rate,
 			   pcc->decisions_count);
 		pcc->moving = true;
 	    pcc_setup_intervals_moving(pcc);
 	} else {
-		printk(KERN_INFO "%d decide: stay %d (%d)\n", pcc->id,
+		printk(KERN_INFO "%d decide: stay %lld (%d)\n", pcc->id,
 			pcc->rate, pcc->decisions_count);
 	    pcc_setup_intervals_probing(pcc);
 	}
@@ -514,7 +514,7 @@ static void pcc_decide_moving(struct sock *sk, struct pcc_data *pcc)
         tcp_sk(sk)->mss_cache) / pcc_get_rtt(tcp_sk(sk));
     new_rate = max(new_rate, packet_min_rate);
 	pcc->last_rate = pcc->rate;
-	printk(KERN_INFO "%d moving: new rate %lld (%d) old rate %d\n",
+	printk(KERN_INFO "%d moving: new rate %lld (%d) old rate %lld\n",
 		   pcc->id, new_rate,
 		   pcc->decisions_count, pcc->last_rate);
 	pcc->rate = new_rate;
